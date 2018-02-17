@@ -34,6 +34,10 @@ bool gecko_vr_init()
 
 void gecko_vr_shutdown()
 {
+  if (api_shmem) {
+    api_shmem->generationA = -1;
+    api_shmem->generationB = -1;
+  }
   CloseShmem();
 }
 

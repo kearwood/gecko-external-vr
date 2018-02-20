@@ -18,15 +18,6 @@
 namespace mozilla {
 namespace gfx {
 
-// The maximum number of frames of latency that we would expect before we
-// should give up applying pose prediction.
-// If latency is greater than one second, then the experience is not likely
-// to be corrected by pose prediction.  Setting this value too
-// high may result in unnecessary memory allocation.
-// As the current fastest refresh rate is 90hz, 100 is selected as a
-// conservative value.
-static const int kVRMaxLatencyFrames = 100;
-
 // We assign VR presentations to groups with a bitmask.
 // Currently, we will only display either content or chrome.
 // Later, we will have more groups to support VR home spaces and
@@ -40,15 +31,28 @@ static const uint32_t kVRGroupAll = 0xffffffff;
 
 static const int kVRDisplayNameMaxLen = 256;
 
-enum class VRDeviceType : uint16_t {
-  Oculus,
-  OpenVR,
-  OSVR,
-  GVR,
-  Puppet,
-  External,
-  NumVRDeviceTypes
+#ifndef MOZILLA_INTERNAL_API
+
+struct Point3D
+{
+  float x;
+  float y;
+  float z;
 };
+
+struct IntSize
+{
+  int32_t width;
+  int32_t height;
+};
+
+struct Size
+{
+  float width;
+  float height;
+};
+
+#endif // ifndef MOZILLA_INTERNAL_API
 
 enum class VRDisplayCapabilityFlags : uint16_t {
   Cap_None = 0,
@@ -186,30 +190,7 @@ struct VRFieldOfView {
 
 };
 
-#ifndef MOZILLA_INTERNAL_API
-
-struct Point3D
-{
-  float x;
-  float y;
-  float z;
-};
-
-struct IntSize
-{
-  int32_t width;
-  int32_t height;
-};
-
-struct Size
-{
-  float width;
-  float height;
-};
-
-#endif // ifndef MOZILLA_INTERNAL_API
-
-struct VRDisplayInfo
+struct VRDisplayState
 {
   enum Eye {
     Eye_Left,
@@ -217,17 +198,13 @@ struct VRDisplayInfo
     NumEyes
   };
 
-  uint32_t mDisplayID;
-  VRDeviceType mType;
   char mDisplayName[kVRDisplayNameMaxLen];
   VRDisplayCapabilityFlags mCapabilityFlags;
-  VRFieldOfView mEyeFOV[VRDisplayInfo::NumEyes];
-  Point3D mEyeTranslation[VRDisplayInfo::NumEyes];
+  VRFieldOfView mEyeFOV[VRDisplayState::NumEyes];
+  Point3D mEyeTranslation[VRDisplayState::NumEyes];
   IntSize mEyeResolution;
   bool mIsConnected;
   bool mIsMounted;
-  uint32_t mPresentingGroups;
-  uint32_t mGroupMask;
   Size mStageSize;
   // FINDME! TODO! HACK! This may be unsafe if not consistently packed or Matrix4x4 is not a trivial type:
 #ifdef MOZILLA_INTERNAL_API
@@ -235,69 +212,13 @@ struct VRDisplayInfo
 #else
   float mSittingToStandingTransform[16];
 #endif
-  uint64_t mFrameId;
-  uint32_t mPresentingGeneration;
-  VRHMDSensorState mLastSensorState[kVRMaxLatencyFrames];
-
-#ifdef MOZILLA_INTERNAL_API
-
-  VRDeviceType GetType() const { return mType; }
-  uint32_t GetDisplayID() const { return mDisplayID; }
-  const char* GetDisplayName() const { return mDisplayName; }
-  VRDisplayCapabilityFlags GetCapabilities() const { return mCapabilityFlags; }
-
-  const IntSize& SuggestedEyeResolution() const { return mEyeResolution; }
-  const Point3D& GetEyeTranslation(uint32_t whichEye) const { return mEyeTranslation[whichEye]; }
-  const VRFieldOfView& GetEyeFOV(uint32_t whichEye) const { return mEyeFOV[whichEye]; }
-  bool GetIsConnected() const { return mIsConnected; }
-  bool GetIsMounted() const { return mIsMounted; }
-  uint32_t GetPresentingGroups() const { return mPresentingGroups; }
-  uint32_t GetGroupMask() const { return mGroupMask; }
-  const Size& GetStageSize() const { return mStageSize; }
-  const Matrix4x4& GetSittingToStandingTransform() const { return mSittingToStandingTransform; }
-  uint64_t GetFrameId() const { return mFrameId; }
-
-  bool operator==(const VRDisplayInfo& other) const {
-    for (size_t i = 0; i < kVRMaxLatencyFrames; i++) {
-      if (mLastSensorState[i] != other.mLastSensorState[i]) {
-        return false;
-      }
-    }
-    return mType == other.mType &&
-           mDisplayID == other.mDisplayID &&
-           strncmp(mDisplayName, other.mDisplayName, kVRDisplayNameMaxLen) == 0 &&
-           mCapabilityFlags == other.mCapabilityFlags &&
-           mEyeResolution == other.mEyeResolution &&
-           mIsConnected == other.mIsConnected &&
-           mIsMounted == other.mIsMounted &&
-           mPresentingGroups == other.mPresentingGroups &&
-           mGroupMask == other.mGroupMask &&
-           mEyeFOV[0] == other.mEyeFOV[0] &&
-           mEyeFOV[1] == other.mEyeFOV[1] &&
-           mEyeTranslation[0] == other.mEyeTranslation[0] &&
-           mEyeTranslation[1] == other.mEyeTranslation[1] &&
-           mStageSize == other.mStageSize &&
-           mSittingToStandingTransform == other.mSittingToStandingTransform &&
-           mFrameId == other.mFrameId &&
-           mPresentingGeneration == other.mPresentingGeneration;
-  }
-
-  bool operator!=(const VRDisplayInfo& other) const {
-    return !(*this == other);
-  }
-
-  const VRHMDSensorState& GetSensorState() const
-  {
-    return mLastSensorState[mFrameId % kVRMaxLatencyFrames];
-  }
-
-#endif // MOZILLA_INTERNAL_API
 };
 
 struct VRExternalShmem
 {
   int64_t generationA;
-  VRDisplayInfo displayInfo;
+  VRDisplayState displayState;
+  VRHMDSensorState sensorState;
   int64_t generationB;
 };
 

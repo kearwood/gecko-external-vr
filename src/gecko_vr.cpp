@@ -34,10 +34,6 @@ bool gecko_vr_init()
 
 void gecko_vr_shutdown()
 {
-  if (api_shmem) {
-    api_shmem->generationA = -1;
-    api_shmem->generationB = -1;
-  }
   CloseShmem();
 }
 
@@ -100,11 +96,15 @@ CloseShmem()
 }
 
 void
-gecko_vr_push_state(const VRDisplayInfo& aDisplayInfo)
+gecko_vr_push_state(const VRDisplayState* aDisplayState,
+                    const VRHMDSensorState* aSensorState /* = nullptr */)
 {
   // FINDME!! TODO!! HACK!! Need proper synchronization
   // or memory guard to preserve write order
   api_shmem->generationA++;
-  memcpy((void *)&api_shmem->displayInfo, &aDisplayInfo, sizeof(VRDisplayInfo));
+  memcpy((void *)&api_shmem->displayState, aDisplayState, sizeof(VRDisplayState));
+  if (aSensorState) {
+    memcpy((void *)&api_shmem->sensorState, aSensorState, sizeof(VRHMDSensorState));
+  }
   api_shmem->generationB++;
 }

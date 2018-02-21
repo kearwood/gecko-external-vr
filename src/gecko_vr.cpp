@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <string.h>
 #include <stdint.h>
 #include <assert.h>
@@ -12,7 +11,13 @@
 #include <sys/stat.h>        /* For mode constants */
 #include <fcntl.h>           /* For O_* constants */
 #include <errno.h>
+#include <unistd.h>
 #endif // defined(__APPLE__)
+
+#if defined(_WIN32)
+#include <Windows.h>
+#include <sys/types.h>
+#endif // defined(_WIN32)
 
 #include "gecko_vr.h"
 
@@ -41,7 +46,10 @@ void gecko_vr_shutdown()
 // This must be less that 31 characters
 static const char* kShmemName = "/moz.gecko.vr_ext.0.0.1";
 int api_shmem_fd = 0;
-#endif // defined(__APPLE__)
+#elif defined(_WIN32)
+static const char* kShmemName = "moz.gecko.vr_ext.0.0.1";
+HANDLE api_shmem_file = NULL;
+#endif
 
 void OpenShmem()
 {
@@ -74,7 +82,30 @@ void OpenShmem()
   }
   fprintf(stderr, "Created Shmem\n");
 
-#endif // defined(__APPLE__)
+#elif defined(_WIN32)
+  if (api_shmem_file == NULL) {
+    api_shmem_file = CreateFileMappingA(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, 8192 /*length*/, kShmemName);
+    if (api_shmem_file == NULL) {
+      DWORD err = GetLastError();
+      fprintf(stderr, "Could not open file mapping object (%d).\n", err);
+      CloseShmem();
+      return;
+    }
+  }
+
+  api_shmem = (VRExternalShmem*)MapViewOfFile(api_shmem_file, // handle to map object
+    FILE_MAP_ALL_ACCESS,  // read/write permission
+    0,
+    0,
+    length);
+
+  if (api_shmem == NULL) {
+    fprintf(stderr, "Could not map view of file (%d).\n",
+      GetLastError());
+    CloseShmem();
+    return;
+  }
+#endif
 }
 
 void
@@ -92,7 +123,18 @@ CloseShmem()
   }
   api_shmem_fd = 0;
   fprintf(stderr, "Closed Shmem\n");
-#endif // defined(__APPLE__)
+#elif defined(_WIN32)
+  if (api_shmem) {
+    UnmapViewOfFile((LPCVOID)api_shmem);
+    api_shmem = NULL;
+  }
+  if (api_shmem_file) {
+    CloseHandle(api_shmem_file);
+    api_shmem_file = NULL;
+  }
+#else
+#error Platform not supported
+#endif
 }
 
 void

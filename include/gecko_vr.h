@@ -5,7 +5,6 @@
 
 bool gecko_vr_init();
 void gecko_vr_shutdown();
-void gecko_vr_push_state(const mozilla::gfx::VRDisplayState* aDisplayState,
-	                     const mozilla::gfx::VRHMDSensorState* aSensorState = nullptr);
+void gecko_vr_push_state(const mozilla::gfx::VRSystemState& aState);
 
 #endif // GECKO_VR_H

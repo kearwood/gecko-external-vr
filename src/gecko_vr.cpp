@@ -96,15 +96,11 @@ CloseShmem()
 }
 
 void
-gecko_vr_push_state(const VRDisplayState* aDisplayState,
-                    const VRHMDSensorState* aSensorState /* = nullptr */)
+gecko_vr_push_state(const mozilla::gfx::VRSystemState& aState)
 {
   // FINDME!! TODO!! HACK!! Need proper synchronization
   // or memory guard to preserve write order
   api_shmem->generationA++;
-  memcpy((void *)&api_shmem->displayState, aDisplayState, sizeof(VRDisplayState));
-  if (aSensorState) {
-    memcpy((void *)&api_shmem->sensorState, aSensorState, sizeof(VRHMDSensorState));
-  }
+  memcpy((void *)&api_shmem->state, &aState, sizeof(VRSystemState));
   api_shmem->generationB++;
 }

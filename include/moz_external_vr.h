@@ -13,9 +13,14 @@
 #ifdef MOZILLA_INTERNAL_API
 #include "mozilla/TypedEnumBits.h"
 #include "mozilla/gfx/2D.h"
-#endif
+#endif // MOZILLA_INTERNAL_API
 
 namespace mozilla {
+#ifdef MOZILLA_INTERNAL_API
+namespace dom {
+  enum class GamepadHand : uint8_t;
+}
+#endif //  MOZILLA_INTERNAL_API
 namespace gfx {
 
 // We assign VR presentations to groups with a bitmask.
@@ -30,6 +35,10 @@ static const uint32_t kVRGroupChrome = 1 << 1;
 static const uint32_t kVRGroupAll = 0xffffffff;
 
 static const int kVRDisplayNameMaxLen = 256;
+static const int kVRControllerNameMaxLen = 256;
+static const int kVRControllerMaxCount = 16;
+static const int kVRControllerMaxTriggers = 16;
+static const int kVRControllerMaxAxis = 16;
 
 #ifndef MOZILLA_INTERNAL_API
 
@@ -50,6 +59,13 @@ struct Size
 {
   float width;
   float height;
+};
+
+enum class ControllerHand : uint8_t {
+  _empty,
+  Left,
+  Right,
+  EndGuard_
 };
 
 #endif // ifndef MOZILLA_INTERNAL_API
@@ -214,11 +230,37 @@ struct VRDisplayState
 #endif
 };
 
+struct VRControllerState
+{
+  char mControllerName[kVRControllerNameMaxLen];
+#ifdef MOZILLA_INTERNAL_API
+  dom::GamepadHand mHand;
+#else
+  ControllerHand mHand;
+#endif
+  uint32_t mNumButtons;
+  uint32_t mNumAxes;
+  uint32_t mNumTriggers;
+  uint32_t mNumHaptics;
+  // The current button pressed bit of button mask.
+  uint64_t mButtonPressed;
+  // The current button touched bit of button mask.
+  uint64_t mButtonTouched;
+  float mTriggerValue[kVRControllerMaxTriggers];
+  float mAxisValue[kVRControllerMaxAxis];
+};
+
+struct VRSystemState
+{
+  VRDisplayState displayState;
+  VRHMDSensorState sensorState;
+  VRControllerState controllerState[kVRControllerMaxCount];
+};
+
 struct VRExternalShmem
 {
   int64_t generationA;
-  VRDisplayState displayState;
-  VRHMDSensorState sensorState;
+  VRSystemState state;
   int64_t generationB;
 };
 

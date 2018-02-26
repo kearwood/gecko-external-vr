@@ -9,6 +9,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <type_traits>
 
 #ifdef MOZILLA_INTERNAL_API
 #include "mozilla/TypedEnumBits.h"
@@ -39,6 +40,7 @@ static const int kVRControllerNameMaxLen = 256;
 static const int kVRControllerMaxCount = 16;
 static const int kVRControllerMaxTriggers = 16;
 static const int kVRControllerMaxAxis = 16;
+static const int kVRLayerMaxCount = 8;
 
 #ifndef MOZILLA_INTERNAL_API
 
@@ -250,6 +252,57 @@ struct VRControllerState
   float mAxisValue[kVRControllerMaxAxis];
 };
 
+struct VRLayerEyeRect
+{
+  float x;
+  float y;
+  float width;
+  float height;
+};
+
+enum class VRLayerType : uint16_t {
+  LayerType_None = 0,
+  LayerType_2D_Content = 1,
+  LayerType_Stereo_Immersive = 2
+};
+
+enum class VRLayerTextureType : uint16_t {
+  LayerTextureType_None = 0,
+  LayerTextureType_DirectX = 1,
+  LayerTextureType_OpenGL = 2,
+  LayerTextureType_Vulkan = 3
+};
+
+struct VRLayer_2D_Content
+{
+  void* mTextureHandle;
+  VRLayerTextureType mTextureType;
+  uint64_t mFrameId;
+};
+
+struct VRLayer_Stereo_Immersive
+{
+  void* mTextureHandle;
+  VRLayerTextureType mTextureType;
+  uint64_t mFrameId;
+  VRLayerEyeRect mLeftEyeRect;
+  VRLayerEyeRect mRightEyeRect;
+};
+
+struct VRLayerState
+{
+  VRLayerType type;
+  union {
+    VRLayer_2D_Content layer_2d_content;
+    VRLayer_Stereo_Immersive layer_stereo_immersive;
+  };
+};
+
+struct VRBrowserState
+{
+  VRLayerState layerState[kVRLayerMaxCount];
+};
+
 struct VRSystemState
 {
   VRDisplayState displayState;
@@ -262,7 +315,11 @@ struct VRExternalShmem
   int64_t generationA;
   VRSystemState state;
   int64_t generationB;
+  int64_t browserGenerationA;
+  VRBrowserState browserState;
+  int64_t browserGenerationB;
 };
+static_assert(std::is_pod<VRExternalShmem>::value, "VRExternalShmem must be a POD type.");
 
 } // namespace gfx
 } // namespace mozilla

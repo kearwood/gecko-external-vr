@@ -19,6 +19,17 @@
 #include <sys/types.h>
 #endif // defined(_WIN32)
 
+#if defined(__ANDROID__)
+
+#include <fcntl.h>           /* For O_* constants */
+#include <sys/ioctl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <linux/ashmem.h>
+#include <unistd.h>
+#endif
+
 #include "gecko_vr.h"
 
 using namespace mozilla::gfx;
@@ -49,6 +60,9 @@ int api_shmem_fd = 0;
 #elif defined(_WIN32)
 static const char* kShmemName = "moz.gecko.vr_ext.0.0.1";
 HANDLE api_shmem_file = NULL;
+#elif defined(__ANDROID__)
+static const char* kShmemName = "moz.gecko.vr_ext.0.0.1";
+int api_shmem_handle = 0;
 #endif
 
 void OpenShmem()
@@ -105,14 +119,37 @@ void OpenShmem()
     CloseShmem();
     return;
   }
+#elif defined(__ANDROID__)
+    if (api_shmem_handle == 0) {
+      api_shmem_handle = open("/" ASHMEM_NAME_DEF, O_RDWR, 0600);
+    }
+    if (api_shmem_handle < 0) {
+      fprintf(stderr, "ashmem open failed\n");
+      CloseShmem();
+      return;
+    }
+    if (ioctl(api_shmem_handle, ASHMEM_SET_SIZE, length)) {
+      fprintf(stderr, "ashmem set size failed\n");
+      CloseShmem();
+      return;
+    }
+    api_shmem = (VRExternalShmem*)mmap(nullptr, length, PROT_READ | PROT_WRITE, MAP_SHARED, api_shmem_handle, 0);
+    if (api_shmem == (VRExternalShmem*)MAP_FAILED) {
+      api_shmem = NULL;
+      fprintf(stderr, "mmap failed");
+      CloseShmem();
+      return;
+    }
+#else
+#error Platform not supported
 #endif
 }
 
 void
 CloseShmem()
 {
-#if defined(__APPLE__)
   fprintf(stderr, "Closing Shmem...\n");
+#if defined(__APPLE__)
   shm_unlink(kShmemName);
   if (api_shmem) {
     munmap((void *)api_shmem, sizeof(VRExternalShmem));
@@ -122,7 +159,6 @@ CloseShmem()
     close(api_shmem_fd);
   }
   api_shmem_fd = 0;
-  fprintf(stderr, "Closed Shmem\n");
 #elif defined(_WIN32)
   if (api_shmem) {
     UnmapViewOfFile((LPCVOID)api_shmem);
@@ -132,16 +168,27 @@ CloseShmem()
     CloseHandle(api_shmem_file);
     api_shmem_file = NULL;
   }
+#elif defined(__ANDROID__)
+  if (api_shmem) {
+    munmap((void *)api_shmem, sizeof(VRExternalShmem));
+    api_shmem = NULL;
+  }
+  if (api_shmem_handle) {
+    close(api_shmem_handle);
+  }
+  api_shmem_handle = 0;
 #else
 #error Platform not supported
 #endif
+  fprintf(stderr, "Closed Shmem\n");
 }
 
 void
 gecko_vr_push_state(const mozilla::gfx::VRSystemState& aState)
 {
   // FINDME!! TODO!! HACK!! Need proper synchronization
-  // or memory guard to preserve write order
+  // or memory guard to preserve write order.
+  // ARM specific synchronization needed here...
   api_shmem->generationA++;
   memcpy((void *)&api_shmem->state, &aState, sizeof(VRSystemState));
   api_shmem->generationB++;

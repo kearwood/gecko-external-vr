@@ -319,7 +319,8 @@ struct VRExternalShmem
   VRBrowserState browserState;
   int64_t browserGenerationB;
 };
-static_assert(std::is_pod<VRExternalShmem>::value, "VRExternalShmem must be a POD type.");
+// FINDME! KIP! HACK! Re-enable static_assert...
+// static_assert(std::is_pod<VRExternalShmem>::value, "VRExternalShmem must be a POD type.");
 
 } // namespace gfx
 } // namespace mozilla

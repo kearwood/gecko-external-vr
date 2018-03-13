@@ -42,26 +42,26 @@ static const int kVRControllerMaxTriggers = 16;
 static const int kVRControllerMaxAxis = 16;
 static const int kVRLayerMaxCount = 8;
 
-#ifndef MOZILLA_INTERNAL_API
-
-struct Point3D
+struct Point3D_POD
 {
   float x;
   float y;
   float z;
 };
 
-struct IntSize
+struct IntSize_POD
 {
   int32_t width;
   int32_t height;
 };
 
-struct Size
+struct FloatSize_POD
 {
   float width;
   float height;
 };
+
+#ifndef MOZILLA_INTERNAL_API
 
 enum class ControllerHand : uint8_t {
   _empty,
@@ -219,17 +219,13 @@ struct VRDisplayState
   char mDisplayName[kVRDisplayNameMaxLen];
   VRDisplayCapabilityFlags mCapabilityFlags;
   VRFieldOfView mEyeFOV[VRDisplayState::NumEyes];
-  Point3D mEyeTranslation[VRDisplayState::NumEyes];
-  IntSize mEyeResolution;
+  Point3D_POD mEyeTranslation[VRDisplayState::NumEyes];
+  IntSize_POD mEyeResolution;
   bool mIsConnected;
   bool mIsMounted;
-  Size mStageSize;
-  // FINDME! TODO! HACK! This may be unsafe if not consistently packed or Matrix4x4 is not a trivial type:
-#ifdef MOZILLA_INTERNAL_API
-  Matrix4x4 mSittingToStandingTransform;
-#else
+  FloatSize_POD mStageSize;
+  // We can't use a Matrix4x4 here unless we ensure it's a POD type
   float mSittingToStandingTransform[16];
-#endif
 };
 
 struct VRControllerState
@@ -320,6 +316,7 @@ struct VRExternalShmem
   int64_t browserGenerationB;
 };
 
+// As we are memcpy'ing VRExternalShmem and its members around, it must be a POD type
 static_assert(std::is_pod<VRExternalShmem>::value, "VRExternalShmem must be a POD type.");
 
 } // namespace gfx
